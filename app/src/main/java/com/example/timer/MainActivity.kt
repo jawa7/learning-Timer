@@ -12,15 +12,21 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import com.google.accompanist.pager.calculateCurrentOffsetForPage
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ScaleFactor
+import androidx.compose.ui.layout.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.accompanist.pager.ExperimentalPagerApi
 import com.google.accompanist.pager.HorizontalPager
 import com.google.accompanist.pager.rememberPagerState
 import kotlin.math.PI
+import kotlin.math.absoluteValue
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -33,22 +39,66 @@ class MainActivity : ComponentActivity() {
                 color = Color(0xFF101010),
                 modifier = Modifier.fillMaxSize()
             ) {
-                var seconds = remember { mutableStateOf(5) }
-                Column {
+                val viewModel: TimerViewModel = viewModel()
+                Column(
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Timer(
-                        seconds = seconds.value,
                         inactiveBarColor = Color.DarkGray,
                         activeBarColor = Color(0xFF37B900),
                     )
 
-                    val pagerState = rememberPagerState(12)
-                    HorizontalPager(state = pagerState, Modifier.size(300.dp)) { page ->
-                        Text(
-                            text = "Page: ${page}",
+                    val pagerState = rememberPagerState(
+                        pageCount = 12,
+                    )
+                    LaunchedEffect(pagerState.currentPage) {
+                        viewModel.seconds.value = pagerState.currentPage + 1
+                        viewModel.progress.value = pagerState.currentPage + 1
+                    }
+                    HorizontalPager(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        state = pagerState,
+                        modifier = Modifier
+                            .height(100.dp)
+                            .fillMaxWidth(),
+                        itemSpacing = 100.dp,
+                    ) { page ->
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { seconds.value = page }
-                        )
+                                .graphicsLayer {
+                                    val pageOffset = calculateCurrentOffsetForPage(page).absoluteValue
+
+                                    lerp(
+                                        start = ScaleFactor(0.55f, 0.55f),
+                                        stop = ScaleFactor(1f, 1f),
+                                        fraction = 1f - pageOffset.coerceIn(0f, 1f)
+                                    ).also { scale ->
+                                        scaleX = scale.scaleX
+                                        scaleY = scale.scaleY
+                                    }
+
+                                    alpha = lerp(
+                                        start = ScaleFactor(0.5f, 0.5f),
+                                        stop = ScaleFactor(1f, 1f),
+                                        fraction = 1f - pageOffset.coerceIn(0f, 1f)
+                                    ).scaleX
+                                },
+                        ) {
+                            Text(
+                                text = "${page + 1}",
+                                modifier = Modifier
+                                    .clickable(
+                                        onClick = {
+                                        viewModel.seconds.value = page + 1
+
+                                    }),
+
+                                style = MaterialTheme.typography.h3,
+                                color = Color.White
+                            )
+                        }
                     }
                 }
             }
@@ -61,30 +111,12 @@ class MainActivity : ComponentActivity() {
 fun Timer(
     inactiveBarColor: Color,
     activeBarColor: Color,
-    seconds: Int
 ) {
-    val started = remember { mutableStateOf(false) }
-    val finished = remember { mutableStateOf(true) }
-    val progress = remember { mutableStateOf(seconds * 100) }
-
-    val countDownTimer = object : CountDownTimer(seconds * 1000L, 10L) {
-        override fun onFinish() {
-            finished.value = true
-            started.value = false
-        }
-
-        override fun onTick(millisUntilFinished: Long) {
-            progress.value = (millisUntilFinished / 10L).toInt()
-        }
-    }
-
-    fun cancel() {
-        countDownTimer.cancel()
-    }
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier.size(250.dp)
-    ) {
+    val viewModel: TimerViewModel = viewModel()
+    Column() {
+        Box(
+            modifier = Modifier.size(250.dp)
+        ) {
             Canvas(
                 modifier = Modifier.fillMaxSize()
             ) {
@@ -95,7 +127,7 @@ fun Timer(
                     useCenter = false,
                     style = Stroke(width = 10F)
                 )
-                val ratio = progress.value.toFloat() / seconds / 100
+                val ratio = viewModel.progress.value.toFloat() / viewModel.seconds.value / 100
                 val sweepAngle = 360F * (ratio - 1)
                 drawArc(
                     color = activeBarColor,
@@ -113,42 +145,46 @@ fun Timer(
                     center = Offset(x.toFloat(), y.toFloat())
                 )
             }
-                Text(
-                    text = (progress.value / 100).toString(),
-                    fontSize = 44.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Box {
-                    Button(
-                        onClick = {
-                            if (!started.value) {
-                                started.value = true
-                                finished.value = false
-                                countDownTimer.start()
-                            } else {
-                                cancel()
-                            }
-                        },
-                        modifier = Modifier.align(Alignment.BottomCenter),
-                        colors = ButtonDefaults.buttonColors(
-                            backgroundColor = if (!started.value) {
-                                Color.Green
-                            } else {
-                                Color.Red
-                            }
-                        )
-                    ) {
-                        Text(
-                            text = if (!started.value) {
-                                "Start"
-                            } else {
-                                "Stop"
-                            }
-                        )
+            Text(
+                text = (viewModel.progress.value / 100).toString(),
+                fontSize = 44.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+        Box(
+            modifier = Modifier
+                .padding(24.dp)
+                .align(Alignment.CenterHorizontally)
+        ) {
+            Button(
+                onClick = {
+                    if (!viewModel.started.value) {
+                        viewModel.started.value = true
+                        viewModel.finished.value = false
+                        viewModel.startCountDown()
+                    } else {
+                        viewModel.cancelCountDown()
                     }
-                }
+                },
+                modifier = Modifier.align(Alignment.BottomCenter),
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = if (!viewModel.started.value) {
+                        Color.Green
+                    } else {
+                        Color.Red
+                    }
+                )
+            ) {
+                Text(
+                    text = if (!viewModel.started.value) {
+                        "Start"
+                    } else {
+                        "Stop"
+                    }
+                )
             }
         }
-
-
+    }
+}
