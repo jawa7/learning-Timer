@@ -14,7 +14,7 @@ class TimerViewModel : ViewModel() {
     private var countDownTimer: CountDownTimer? = null
 
     fun startCountDown() {
-        countDownTimer = object : CountDownTimer(seconds.value * 1000L, 10L) {
+        countDownTimer = object : CountDownTimer(progress.value * 1000L, 10L) {
 
             override fun onFinish() {
                 finished.value = true
@@ -24,8 +24,7 @@ class TimerViewModel : ViewModel() {
             override fun onTick(millisUntilFinished: Long) {
                 progress.value = (millisUntilFinished / 10L).toInt()
             }
-        }
-        countDownTimer?.start()
+        }.start()
     }
 
     fun cancelCountDown() {

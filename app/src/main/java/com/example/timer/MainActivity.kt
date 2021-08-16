@@ -50,7 +50,7 @@ class MainActivity : ComponentActivity() {
                     )
 
                     val pagerState = rememberPagerState(
-                        pageCount = 12,
+                        pageCount = 60,
                     )
                     LaunchedEffect(pagerState.currentPage) {
                         viewModel.seconds.value = pagerState.currentPage + 1
@@ -140,13 +140,13 @@ fun Timer(
                 val x = radius + radius * sin(-PI - 2 * PI * ratio)
                 val y = radius + radius * cos(-PI - 2 * PI * ratio)
                 drawCircle(
-                    color = inactiveBarColor,
+                    color = activeBarColor,
                     radius = 20F,
                     center = Offset(x.toFloat(), y.toFloat())
                 )
             }
             Text(
-                text = (viewModel.progress.value / 100).toString(),
+                text = viewModel.progress.value.div(100).toString(),
                 fontSize = 44.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
@@ -165,6 +165,8 @@ fun Timer(
                         viewModel.finished.value = false
                         viewModel.startCountDown()
                     } else {
+                        viewModel.started.value = false
+                        viewModel.finished.value = true
                         viewModel.cancelCountDown()
                     }
                 },
